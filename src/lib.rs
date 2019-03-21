@@ -65,7 +65,7 @@ impl Galaxy {
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
         // );
-        // let norm = 1.0 / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        // let norm = 1.0 / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
         // n[0] *= norm;
         // n[1] *= norm;
         // n[2] *= norm;
@@ -74,24 +74,29 @@ impl Galaxy {
         let n = Vector3::new(0.0, 0.0, 1.0);
 
         for _ in 0..STAR_COUNT {
-            let r = Vector3::new(
-                rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
-                rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
-                rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
-            );
 
-            println!("x vel: {:?}", n[1] * r[2] - n[2] * r[1]);
+            let rv = loop {
+                let rv = Vector3::<f64>::new(
+                    rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
+                    rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
+                    rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
+                );
+                let r = (rv[0] * rv[0] + rv[1] * rv[1] + rv[2] * rv[2]).sqrt();
+                if r < SPHERE_RADIUS {
+                    break rv;
+                }
+            };
 
             let new_vel = Vector3::new(
-                ANGULAR_VELOCITY * (n[1] * r[2] - n[2] * r[1]),
-                ANGULAR_VELOCITY * (n[2] * r[0] - n[0] * r[2]),
-                ANGULAR_VELOCITY * (n[0] * r[1] - n[1] * r[0]),
+                ANGULAR_VELOCITY * (n[1] * rv[2] - n[2] * rv[1]),
+                ANGULAR_VELOCITY * (n[2] * rv[0] - n[0] * rv[2]),
+                ANGULAR_VELOCITY * (n[0] * rv[1] - n[1] * rv[0]),
             );
 
             let new_pos = Vector3::new(
-                0.5 * GALAXY_WIDTH + r[0],
-                0.5 * GALAXY_WIDTH + r[1],
-                0.5 * GALAXY_WIDTH + r[2],
+                0.5 * GALAXY_WIDTH + rv[0],
+                0.5 * GALAXY_WIDTH + rv[1],
+                0.5 * GALAXY_WIDTH + rv[2],
             );
             let star = Star::new()
                 .with_position(new_pos)

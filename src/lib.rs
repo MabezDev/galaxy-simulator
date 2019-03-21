@@ -9,12 +9,14 @@ pub const GALAXY_WIDTH: f64 = 100.0;
 pub const SPHERE_RADIUS: f64 = 20.0;
 pub const ANGULAR_VELOCITY: f64 = 0.4;
 pub const DELTA_TIME: f64 = 0.002; 
+pub const DELTA_TIME_HALF: f64 = 0.002 / 2.0; 
+pub const DELTA_TIME_SQUARED_HALF: f64 = (DELTA_TIME * DELTA_TIME) / 2.0; 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Star {
-    position : Vector3<f64>,
-    velocities : Vector3<f64>,
-    accelerations : Vector3<f64>,
+    pub position : Vector3<f64>,
+    pub velocity : Vector3<f64>,
+    pub acceleration : Vector3<f64>,
 }
 
 impl Star {
@@ -22,8 +24,8 @@ impl Star {
     pub fn new() -> Self {
         Star {
             position: Vector3::new(0.0,0.0,0.0),
-            velocities: Vector3::new(0.0,0.0,0.0),
-            accelerations: Vector3::new(0.0,0.0,0.0),
+            velocity: Vector3::new(0.0,0.0,0.0),
+            acceleration: Vector3::new(0.0,0.0,0.0),
         }
     }
 
@@ -35,13 +37,13 @@ impl Star {
     }
     pub fn with_velocities(self, vector: Vector3<f64>) -> Self {
         Self {
-            velocities: vector,
+            velocity: vector,
             .. self
         }
     }
     pub fn with_accelerations(self, vector: Vector3<f64>) -> Self {
         Self {
-            accelerations: vector,
+            acceleration: vector,
             .. self
         }
     }
@@ -57,7 +59,7 @@ impl Galaxy {
         let mut stars = Vec::with_capacity(STAR_COUNT as usize);
         // Randomly choose plane for net angular velocity
         let mut rng = thread_rng();
-        
+
         // let mut n = Vector3::new(
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
@@ -100,6 +102,36 @@ impl Galaxy {
         Galaxy {
             stars: stars
         }
+    }
+
+    /// Services the galaxy for one complete iteration
+    pub fn compute_delta(&mut self) {
+        // Verlet integration:
+        // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
+
+        for star in self.stars.iter_mut() {
+            star.position = Vector3::new(
+                star.position[0] + (star.velocity[0] * DELTA_TIME) + (star.acceleration[0] * DELTA_TIME_SQUARED_HALF),
+                star.position[1] + (star.velocity[1] * DELTA_TIME) + (star.acceleration[1] * DELTA_TIME_SQUARED_HALF),
+                star.position[2] + (star.velocity[2] * DELTA_TIME) + (star.acceleration[2] * DELTA_TIME_SQUARED_HALF),
+            );
+        }
+
+        self.compute_accelerations();
+
+        // we have calculated new accelerations - update the velocities
+        for star in self.stars.iter_mut() {
+            star.velocity = Vector3::new(
+                star.velocity[0] + (star.acceleration[0] * DELTA_TIME_HALF),
+                star.velocity[1] + (star.acceleration[1] * DELTA_TIME_HALF),
+                star.velocity[2] + (star.acceleration[2] * DELTA_TIME_HALF),
+            );
+        }
+
+    }
+
+    fn compute_accelerations(&mut self) {
+        
     }
 }
 

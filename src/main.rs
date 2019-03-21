@@ -3,5 +3,9 @@ use galaxy_sim::Galaxy;
 
 fn main() {
     println!("Hello, world!");
-    Galaxy::new();
+    let mut galaxy = Galaxy::new();
+
+    loop {
+        galaxy.compute_delta();
+    }
 }

@@ -3,7 +3,7 @@
 use nalgebra::base::Vector3;
 use rand::prelude::*;
 
-pub const STAR_COUNT: u64 = 5/* 2000 */;
+pub const STAR_COUNT: u64 = 2000;
 pub const GALAXY_WIDTH: f64 = 100.0;
 
 pub const SPHERE_RADIUS: f64 = 20.0;
@@ -132,6 +132,10 @@ impl Galaxy {
 
     fn compute_accelerations(&mut self) {
         
+    }
+
+    pub fn get_stars(&self) -> &Vec<Star> {
+        &self.stars
     }
 }
 

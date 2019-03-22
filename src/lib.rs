@@ -2,9 +2,11 @@
 
 use nalgebra::base::Vector3;
 use rand::prelude::*;
+use rayon::prelude::*;
 
 pub const STAR_COUNT: u64 = 2000;
 pub const GALAXY_WIDTH: f64 = 100.0;
+pub const WORK: usize = 250;
 
 pub const SPHERE_RADIUS: f64 = 20.0;
 pub const ANGULAR_VELOCITY: f64 = 0.4;
@@ -150,26 +152,48 @@ impl Galaxy {
         // You can remove these assignments and extend the j loop to a fixed
         // upper bound of N, or, for extra credit, find a cleverer solution!)
 
-        for i in 1..STAR_COUNT as usize {
-            for j in 0..i {
-                // Vector version of inverse square law
-                let dp = self.stars[i].position - self.stars[j].position;
-                let dp2 = dp.component_mul(&dp);
-                let r_squared = dp2.sum();
-                let r = r_squared.sqrt();
-                let r_inverse_cubed = 1.0 / (r_squared * r);
+        let works: Vec<_> = self.stars.par_chunks(WORK).collect();
+        for stars in works {
+            for i in 0..stars.len() {
+                for j in 0..i {
+                    // Vector version of inverse square law
+                    let dp = self.stars[i].position - self.stars[j].position;
+                    let dp2 = dp.component_mul(&dp);
+                    let r_squared = dp2.sum();
+                    let r = r_squared.sqrt();
+                    let r_inverse_cubed = 1.0 / (r_squared * r);
 
-                let delta_acc = dp.component_mul(&Vector3::new(
-                    -r_inverse_cubed,
-                    -r_inverse_cubed,
-                    -r_inverse_cubed
-                ));
+                    let delta_acc = dp.component_mul(& Vector3::new(
+                        -r_inverse_cubed,
+                        -r_inverse_cubed,
+                        -r_inverse_cubed
+                    ));
 
-                // // add this force on to i's acceleration (mass = 1)
-                self.stars[i].acceleration += delta_acc;
-                // newtons third law
-                self.stars[j].acceleration -= delta_acc;
+                    // // add this force on to i's acceleration (mass = 1)
+                    self.stars[i].acceleration += delta_acc;
+                    // newtons third law
+                    self.stars[j].acceleration -= delta_acc;
+                }
             }
+            // for j in 0..i {
+            //     // Vector version of inverse square law
+            //     let dp = self.stars[i].position - self.stars[j].position;
+            //     let dp2 = dp.component_mul(&dp);
+            //     let r_squared = dp2.sum();
+            //     let r = r_squared.sqrt();
+            //     let r_inverse_cubed = 1.0 / (r_squared * r);
+
+            //     let delta_acc = dp.component_mul(& Vector3::new(
+            //         -r_inverse_cubed,
+            //         -r_inverse_cubed,
+            //         -r_inverse_cubed
+            //     ));
+
+            //     // // add this force on to i's acceleration (mass = 1)
+            //     self.stars[i].acceleration += delta_acc;
+            //     // newtons third law
+            //     self.stars[j].acceleration -= delta_acc;
+            // }
         }
     }
 

@@ -81,7 +81,7 @@ impl Galaxy {
                     rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
                     rng.gen_range(-SPHERE_RADIUS, SPHERE_RADIUS),
                 );
-                let r = (rv[0] * rv[0] + rv[1] * rv[1] + rv[2] * rv[2]).sqrt();
+                let r = (rv[0].powf(2.0) + rv[1].powf(2.0) + rv[2].powf(2.0)).sqrt();
                 if r < SPHERE_RADIUS {
                     break rv;
                 }
@@ -136,7 +136,41 @@ impl Galaxy {
     }
 
     fn compute_accelerations(&mut self) {
-        
+        for star in self.stars.iter_mut() {
+            star.acceleration = Vector3::zeros();
+        }
+
+        // Interaction forces (gravity)
+        // This is where the program spends most of its time.
+
+        // (NOTE: use of Newton's 3rd law below to essentially half number
+        // of calculations needs some care in a parallel version.
+        // A naive decomposition on the i loop can lead to a race condition
+        // because you are assigning to ax[j], etc.
+        // You can remove these assignments and extend the j loop to a fixed
+        // upper bound of N, or, for extra credit, find a cleverer solution!)
+
+        for i in 1..STAR_COUNT as usize {
+            for j in 0..i {
+                // Vector version of inverse square law
+                let dp = self.stars[i].position - self.stars[j].position;
+                let dp2 = dp.component_mul(&dp);
+                let r_squared = dp2.sum();
+                let r = r_squared.sqrt();
+                let r_inverse_cubed = 1.0 / (r_squared * r);
+
+                let delta_acc = dp.component_mul(&Vector3::new(
+                    -r_inverse_cubed,
+                    -r_inverse_cubed,
+                    -r_inverse_cubed
+                ));
+
+                // // add this force on to i's acceleration (mass = 1)
+                self.stars[i].acceleration += delta_acc;
+                // newtons third law
+                self.stars[j].acceleration -= delta_acc;
+            }
+        }
     }
 
     pub fn get_stars(&self) -> &Vec<Star> {

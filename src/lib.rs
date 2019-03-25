@@ -2,6 +2,7 @@
 
 use nalgebra::base::Vector3;
 use rand::prelude::*;
+use rayon::prelude::*;
 
 pub const STAR_COUNT: u64 = 2000;
 pub const GALAXY_WIDTH: f64 = 100.0;
@@ -17,6 +18,7 @@ pub struct Star {
     pub position : Vector3<f64>,
     pub velocity : Vector3<f64>,
     pub acceleration : Vector3<f64>,
+    pub mass : f64,
 }
 
 impl Star {
@@ -26,6 +28,7 @@ impl Star {
             position: Vector3::new(0.0,0.0,0.0),
             velocity: Vector3::new(0.0,0.0,0.0),
             acceleration: Vector3::new(0.0,0.0,0.0),
+            mass: 1.0,
         }
     }
 
@@ -47,10 +50,17 @@ impl Star {
             .. self
         }
     }
+    pub fn with_mass(self, vector:f64) -> Self {
+        Self {
+            mass: vector,
+            .. self
+        }
+    }
 }
 
 pub struct Galaxy {
-    stars: Vec<Star>,
+    stars: (Vec<Star>, Vec<Star>),
+    iter: usize,
 }
 
 impl Galaxy {
@@ -101,80 +111,76 @@ impl Galaxy {
             let star = Star::new()
                 .with_position(new_pos)
                 .with_velocities(new_vel);
+                // .with_mass(rng.gen_range(1, 5) as f64);
             stars.push(star);
         }
 
         Galaxy {
-            stars: stars
+            stars: (stars.clone(), stars),
+            iter: 0
         }
     }
 
     /// Services the galaxy for one complete iteration
-    pub fn compute_delta(&mut self) {
+    pub fn compute_delta(&mut self) -> &[Star] {
         // Verlet integration:
         // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
 
-        for star in self.stars.iter_mut() {
-            star.position = Vector3::new(
-                star.position[0] + (star.velocity[0] * DELTA_TIME) + (star.acceleration[0] * DELTA_TIME_SQUARED_HALF),
-                star.position[1] + (star.velocity[1] * DELTA_TIME) + (star.acceleration[1] * DELTA_TIME_SQUARED_HALF),
-                star.position[2] + (star.velocity[2] * DELTA_TIME) + (star.acceleration[2] * DELTA_TIME_SQUARED_HALF),
-            );
-        }
+        // we avoid the use of locks by double buffering the stars
+        let (currrent_stars, future_stars) = if (self.iter & 1) == 0 {
+            (&self.stars.0, &mut self.stars.1)
+        } else {
+            (&self.stars.1, &mut self.stars.0)
+        };
 
-        self.compute_accelerations();
+        future_stars.iter_mut() // iterate over the future stars
+            .zip(&currrent_stars[..]) // zip in the old stars state (old actually means current stars) for calculations
+            .for_each(|(fut_star, curr_star)| {
+                fut_star.position = Vector3::new(
+                    curr_star.position[0] + (curr_star.velocity[0] * DELTA_TIME) + (curr_star.acceleration[0] * DELTA_TIME_SQUARED_HALF),
+                    curr_star.position[1] + (curr_star.velocity[1] * DELTA_TIME) + (curr_star.acceleration[1] * DELTA_TIME_SQUARED_HALF),
+                    curr_star.position[2] + (curr_star.velocity[2] * DELTA_TIME) + (curr_star.acceleration[2] * DELTA_TIME_SQUARED_HALF),
+                );
 
-        // we have calculated new accelerations - update the velocities
-        for star in self.stars.iter_mut() {
-            star.velocity = Vector3::new(
-                star.velocity[0] + (star.acceleration[0] * DELTA_TIME_HALF),
-                star.velocity[1] + (star.acceleration[1] * DELTA_TIME_HALF),
-                star.velocity[2] + (star.acceleration[2] * DELTA_TIME_HALF),
-            );
-        }
+                // based on the current stars, compute the new acceleration for the future star state
+                fut_star.acceleration = Galaxy::compute_accelerations(curr_star, currrent_stars);
 
+                // calculate the new velocity with the new accell
+                fut_star.velocity = Vector3::new(
+                    curr_star.velocity[0] + (fut_star.acceleration[0] * DELTA_TIME_HALF),
+                    curr_star.velocity[1] + (fut_star.acceleration[1] * DELTA_TIME_HALF),
+                    curr_star.velocity[2] + (fut_star.acceleration[2] * DELTA_TIME_HALF),
+                );
+                
+            });
+
+        self.iter += 1;
+
+        future_stars
     }
 
-    fn compute_accelerations(&mut self) {
-        for star in self.stars.iter_mut() {
-            star.acceleration = Vector3::zeros();
-        }
+    /// Iterates through the current state of the galaxy, calculating newtons third law on each star
+    fn compute_accelerations(curr_star: &Star, current_galaxy: &[Star]) -> Vector3<f64> {
+        
+        let zero: Vector3<f64> = Vector3::zeros();
+        let accel = current_galaxy
+            .iter()
+            .fold(zero, |mut accumalated, star| {
+                let dp = curr_star.position - star.position;
+                if dp != zero {
+                    let dp2 = dp.component_mul(&dp);
+                    let r_squared = dp2.sum();
+                    let r = r_squared.sqrt();
+                    let r_inverse_cubed = 1.0 / (r_squared * r);
 
-        // Interaction forces (gravity)
-        // This is where the program spends most of its time.
+                    let delta_acc = dp.component_mul(&Vector3::new(-r_inverse_cubed,-r_inverse_cubed,-r_inverse_cubed));
 
-        // (NOTE: use of Newton's 3rd law below to essentially half number
-        // of calculations needs some care in a parallel version.
-        // A naive decomposition on the i loop can lead to a race condition
-        // because you are assigning to ax[j], etc.
-        // You can remove these assignments and extend the j loop to a fixed
-        // upper bound of N, or, for extra credit, find a cleverer solution!)
+                    accumalated += delta_acc * curr_star.mass;
+                }
+                accumalated
+            });
 
-        for i in 1..STAR_COUNT as usize {
-            for j in 0..i {
-                // Vector version of inverse square law
-                let dp = self.stars[i].position - self.stars[j].position;
-                let dp2 = dp.component_mul(&dp);
-                let r_squared = dp2.sum();
-                let r = r_squared.sqrt();
-                let r_inverse_cubed = 1.0 / (r_squared * r);
-
-                let delta_acc = dp.component_mul(&Vector3::new(
-                    -r_inverse_cubed,
-                    -r_inverse_cubed,
-                    -r_inverse_cubed
-                ));
-
-                // // add this force on to i's acceleration (mass = 1)
-                self.stars[i].acceleration += delta_acc;
-                // newtons third law
-                self.stars[j].acceleration -= delta_acc;
-            }
-        }
-    }
-
-    pub fn get_stars(&self) -> &Vec<Star> {
-        &self.stars
+        accel
     }
 }
 

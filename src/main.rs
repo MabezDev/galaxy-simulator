@@ -49,11 +49,11 @@ fn main() {
         canvas.set_draw_color(Color::RGB(255, 255, 255));
         // now our simulations
 
-        galaxy.compute_delta();
+        ;
 
-        for star in galaxy.get_stars() {
+        for star in galaxy.compute_delta() {
             let (x, y) = (star.position[0] * scale, star.position[1] * scale);
-            canvas.fill_rect(Rect::new(x as i32, y as i32, 1, 1)).unwrap();
+            canvas.fill_rect(Rect::new(x as i32, y as i32, star.mass as u32, star.mass as u32)).unwrap();
         }
 
         canvas.present();

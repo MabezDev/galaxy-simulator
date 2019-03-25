@@ -2,6 +2,7 @@
 
 use nalgebra::base::Vector3;
 use rand::prelude::*;
+use rayon::prelude::*;
 
 pub const STAR_COUNT: u64 = 2000;
 pub const GALAXY_WIDTH: f64 = 100.0;
@@ -17,6 +18,7 @@ pub struct Star {
     pub position : Vector3<f64>,
     pub velocity : Vector3<f64>,
     pub acceleration : Vector3<f64>,
+    pub mass : f64,
 }
 
 impl Star {
@@ -26,6 +28,7 @@ impl Star {
             position: Vector3::new(0.0,0.0,0.0),
             velocity: Vector3::new(0.0,0.0,0.0),
             acceleration: Vector3::new(0.0,0.0,0.0),
+            mass: 1.0,
         }
     }
 
@@ -44,6 +47,12 @@ impl Star {
     pub fn with_accelerations(self, vector: Vector3<f64>) -> Self {
         Self {
             acceleration: vector,
+            .. self
+        }
+    }
+    pub fn with_mass(self, vector:f64) -> Self {
+        Self {
+            mass: vector,
             .. self
         }
     }
@@ -101,6 +110,7 @@ impl Galaxy {
             let star = Star::new()
                 .with_position(new_pos)
                 .with_velocities(new_vel);
+                // .with_mass(rng.gen_range(1, 5) as f64);
             stars.push(star);
         }
 
@@ -159,16 +169,14 @@ impl Galaxy {
                 let r = r_squared.sqrt();
                 let r_inverse_cubed = 1.0 / (r_squared * r);
 
-                let delta_acc = dp.component_mul(&Vector3::new(
-                    -r_inverse_cubed,
-                    -r_inverse_cubed,
-                    -r_inverse_cubed
-                ));
+                let delta_acc = dp.component_mul(&Vector3::new(-r_inverse_cubed,-r_inverse_cubed,-r_inverse_cubed));
 
-                // // add this force on to i's acceleration (mass = 1)
-                self.stars[i].acceleration += delta_acc;
+                // // add this force on to i's acceleration (mass = 1) - could we add mass to stars?
+                let i_mass = self.stars[i].mass;
+                let j_mass = self.stars[j].mass;
+                self.stars[i].acceleration += delta_acc * i_mass;
                 // newtons third law
-                self.stars[j].acceleration -= delta_acc;
+                self.stars[j].acceleration -= delta_acc * j_mass;
             }
         }
     }

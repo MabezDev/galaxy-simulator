@@ -1,5 +1,10 @@
+#[macro_use]
+extern crate structopt;
 
-use galaxy_sim::{
+use std::path::PathBuf;
+use structopt::StructOpt;
+
+use galaxy_sim::galaxy::{
     Galaxy,
     GALAXY_WIDTH
 };
@@ -12,10 +17,76 @@ use std::time::Duration;
 
 pub const WINDOW_SIZE: u32 = 800;
 
-fn main() {
-    println!("Hello, world!");
-    let mut galaxy = Galaxy::new();
+pub const STAR_COUNT: u64 = 2000;
 
+/// A basic example
+#[derive(StructOpt, Debug)]
+#[structopt(name = "Galaxy Simulator")]
+struct Opt {
+    // A flag, true if used in the command line. Note doc comment will
+    // be used for the help message of the flag.
+    /// Activate debug mode
+    #[structopt(short = "d", long = "debug")]
+    debug: bool,
+
+    /// Number of stars
+    #[structopt(short = "s", long = "stars", default_value = "2000")]
+    stars: u64,
+
+    /// Number of iterations to complete before stopping
+    #[structopt(short = "i", long = "iter", default_value = "10000")]
+    iterations: u64,
+
+    /// MODE - `single` or `parallel`
+    #[structopt(short = "m", long = "mode", default_value = "single")]
+    mode: String,
+
+    /// Task - `bench` or `visualize`
+    #[structopt(name = "TASK")]
+    task: String,
+
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Mode {
+    Single,
+    Parallel
+}
+
+fn main() {
+    let opt = Opt::from_args();
+    if opt.debug {
+        println!("{:?}", opt);
+    }
+    let mode = match opt.mode.to_lowercase().as_ref() {
+        "single" => Mode::Single,
+        "parallel" => Mode::Parallel,
+        _ => panic!("Invalid --mode option")
+    };
+    match opt.task.to_lowercase().as_ref() {
+        "bench" => {
+            // TODO bench code here
+            let mut _galaxy = Galaxy::new(opt.stars);
+            match mode {
+                Mode::Single => {},
+                Mode::Parallel => {}
+            }
+        },
+        "visualize" => {
+            let mut galaxy = Galaxy::new(opt.stars);
+            match mode {
+                Mode::Single => visualize(&mut galaxy),
+                Mode::Parallel => {}
+            }
+            
+        }
+        _ => panic!("requires a task of either `bench` or `visualize`")
+    }
+    
+}
+
+
+fn visualize(galaxy: &mut Galaxy) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
  
@@ -51,7 +122,7 @@ fn main() {
 
         ;
 
-        for star in galaxy.compute_delta() {
+        for star in galaxy.compute_iter() {
             let (x, y) = (star.position[0] * scale, star.position[1] * scale);
             canvas.fill_rect(Rect::new(x as i32, y as i32, star.mass as u32, star.mass as u32)).unwrap();
         }

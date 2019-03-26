@@ -3,6 +3,7 @@
 use nalgebra::base::Vector3;
 use rand::prelude::*;
 use rayon::prelude::*;
+use rand::distributions::{LogNormal, Distribution};
 
 use crate::star::Star;
 
@@ -38,7 +39,7 @@ impl Galaxy {
         // n[2] *= norm;
 
         // just rotate in x, y plane
-        let n = Vector3::new(0.0, 0.0, 1.0);
+        let n = Vector3::new(0.0, 0.0, 0.0);
 
         for _ in 0..star_count {
 
@@ -65,10 +66,16 @@ impl Galaxy {
                 0.5 * GALAXY_WIDTH + rv[1],
                 0.5 * GALAXY_WIDTH + rv[2],
             );
+
+            
+
+            
+            let ln = LogNormal::new(1.0, 0.6);
+            let _v = ln.sample(&mut rand::thread_rng());
             let star = Star::new()
                 .with_position(new_pos)
                 .with_velocities(new_vel);
-                // .with_mass(rng.gen_range(1, 5) as f64);
+                // .with_mass(v as f64);
             stars.push(star);
         }
 
@@ -135,7 +142,7 @@ impl Galaxy {
 
                     let delta_acc = dp.component_mul(&Vector3::new(-r_inverse_cubed,-r_inverse_cubed,-r_inverse_cubed));
 
-                    accumalated += delta_acc * curr_star.mass;
+                    accumalated += delta_acc / curr_star.mass;
                 }
                 accumalated
             });
@@ -207,12 +214,16 @@ impl Galaxy {
                 accumalated
             }) 
             // we then combine the threads work with a reduce method, in this case we are
-            // accumalating all the calculated acceleration deltas
+            // accumalating all the calculated acceleration deltas accross all threads
             .reduce(
                 || Vector3::zeros(),
                 |a: Vector3<f64>, b: Vector3<f64>| a + b,
             );
 
         accel
+    }
+
+    pub fn iter_count(&self) -> u64 {
+        self.iter
     }
 }

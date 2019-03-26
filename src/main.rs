@@ -1,8 +1,5 @@
-#[macro_use]
-extern crate structopt;
-
-use std::path::PathBuf;
 use structopt::StructOpt;
+use std::time::Instant;
 
 use galaxy_sim::galaxy::{
     Galaxy,
@@ -13,7 +10,6 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use std::time::Duration;
 
 pub const WINDOW_SIZE: u32 = 800;
 
@@ -32,11 +28,11 @@ struct Opt {
     stars: u64,
 
     /// Number of iterations to complete before stopping
-    #[structopt(short = "i", long = "iter", default_value = "10000")]
+    #[structopt(short = "i", long = "iter", default_value = "250")]
     iterations: u64,
 
     /// MODE - `single` or `parallel`
-    #[structopt(short = "m", long = "mode", default_value = "single")]
+    #[structopt(short = "m", long = "mode", default_value = "parallel")]
     mode: String,
 
     /// Number of threads - defaults to the number of logical cores on the machine if not specified
@@ -73,8 +69,8 @@ fn main() {
     };
     match opt.task.to_lowercase().as_ref() {
         "bench" => {
-            // TODO bench code here
-            let mut _galaxy = Galaxy::new(opt.stars);
+            let mut galaxy = Galaxy::new(opt.stars);
+            bench(&mut galaxy, mode, &opt);
         },
         "visualize" => {
             let mut galaxy = Galaxy::new(opt.stars);
@@ -86,13 +82,29 @@ fn main() {
     
 }
 
+fn bench(galaxy: &mut Galaxy, mode: Mode, opt: &Opt) {
+    let start = Instant::now();
+    println!("Running benchmark...");
+    for _ in 0..opt.iterations {
+        match mode {
+            Mode::Single => galaxy.compute_iter(),
+            Mode::Parallel => galaxy.par_compute_iter()
+        };
+    }
+    let end = Instant::now();
+
+    println!("Time to complete: {}ms", end.duration_since(start).as_millis())
+}
 
 fn visualize(galaxy: &mut Galaxy, mode: Mode) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
- 
+    let mut mode = mode;
+    // let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
+
     let window = video_subsystem.window("rust-sdl2 demo", WINDOW_SIZE, WINDOW_SIZE)
         .position_centered()
+        // .opengl()
         .build()
         .unwrap();
  
@@ -115,10 +127,17 @@ fn visualize(galaxy: &mut Galaxy, mode: Mode) {
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
                 },
+                Event::KeyDown { keycode: Some(Keycode::P), .. } => {
+                    mode = Mode::Parallel
+                },
+                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+                    mode = Mode::Single
+                },
                 _ => {}
             }
         }
         canvas.set_draw_color(Color::RGB(255, 255, 255));
+
         // now our simulations
         let stars = match mode {
             Mode::Single => galaxy.compute_iter(),

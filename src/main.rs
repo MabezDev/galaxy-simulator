@@ -74,10 +74,7 @@ fn main() {
         },
         "visualize" => {
             let mut galaxy = Galaxy::new(opt.stars);
-            match mode {
-                Mode::Single => visualize(&mut galaxy),
-                Mode::Parallel => {}
-            }
+            visualize(&mut galaxy, mode);
             
         }
         _ => panic!("requires a task of either `bench` or `visualize`")
@@ -86,7 +83,7 @@ fn main() {
 }
 
 
-fn visualize(galaxy: &mut Galaxy) {
+fn visualize(galaxy: &mut Galaxy, mode: Mode) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
  
@@ -119,10 +116,12 @@ fn visualize(galaxy: &mut Galaxy) {
         }
         canvas.set_draw_color(Color::RGB(255, 255, 255));
         // now our simulations
+        let stars = match mode {
+            Mode::Single => galaxy.compute_iter(),
+            Mode::Parallel => galaxy.par_compute_iter()
+        };
 
-        ;
-
-        for star in galaxy.compute_iter() {
+        for star in stars {
             let (x, y) = (star.position[0] * scale, star.position[1] * scale);
             canvas.fill_rect(Rect::new(x as i32, y as i32, star.mass as u32, star.mass as u32)).unwrap();
         }

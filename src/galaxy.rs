@@ -142,4 +142,75 @@ impl Galaxy {
 
         accel
     }
+
+    /// Services the galaxy for one complete iteration
+    pub fn par_compute_iter(&mut self) -> &[Star] {
+        // Verlet integration:
+        // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
+
+        // we avoid the use of locks by double buffering the stars
+        // we calculate based on the `current_stars` as this is the current state of the galaxy
+        // we put all the calculations for the next iteration in another array
+        let (currrent_stars, future_stars) = if (self.iter & 1) == 0 {
+            (&self.stars.0, &mut self.stars.1)
+        } else {
+            (&self.stars.1, &mut self.stars.0)
+        };
+
+        future_stars.par_iter_mut() // iterate over the future stars
+            .zip(&currrent_stars[..]) // zip in the old stars state (old actually means current stars) for calculations
+            .for_each(|(fut_star, curr_star)| {
+                fut_star.position = Vector3::new(
+                    curr_star.position[0] + (curr_star.velocity[0] * DELTA_TIME) + (curr_star.acceleration[0] * DELTA_TIME_SQUARED_HALF),
+                    curr_star.position[1] + (curr_star.velocity[1] * DELTA_TIME) + (curr_star.acceleration[1] * DELTA_TIME_SQUARED_HALF),
+                    curr_star.position[2] + (curr_star.velocity[2] * DELTA_TIME) + (curr_star.acceleration[2] * DELTA_TIME_SQUARED_HALF),
+                );
+
+                // based on the current stars, compute the new acceleration for the future star state
+                fut_star.acceleration = Galaxy::par_compute_accelerations(curr_star, currrent_stars);
+
+                // calculate the new velocity with the new acceleration
+                fut_star.velocity = Vector3::new(
+                    curr_star.velocity[0] + (fut_star.acceleration[0] * DELTA_TIME_HALF),
+                    curr_star.velocity[1] + (fut_star.acceleration[1] * DELTA_TIME_HALF),
+                    curr_star.velocity[2] + (fut_star.acceleration[2] * DELTA_TIME_HALF),
+                );
+                
+            });
+
+        self.iter += 1;
+
+        future_stars
+    }
+
+    /// Iterates through the current state of the galaxy, calculating newtons third law on each star
+    fn par_compute_accelerations(curr_star: &Star, current_galaxy: &[Star]) -> Vector3<f64> {
+        
+        let zero: Vector3<f64> = Vector3::zeros();
+        let accel = current_galaxy
+            .par_iter()
+            // Starting a zero, we accumulate the affects of other stars on the current star
+            .fold(
+                || zero, 
+                |mut accumalated, star| {
+                let dp = curr_star.position - star.position;
+                if dp != zero { // make sure we don't check against ourself
+                    let dp2 = dp.component_mul(&dp);
+                    let r_squared = dp2.sum();
+                    let r = r_squared.sqrt();
+                    let r_inverse_cubed = 1.0 / (r_squared * r);
+
+                    let delta_acc = dp.component_mul(&Vector3::new(-r_inverse_cubed,-r_inverse_cubed,-r_inverse_cubed));
+
+                    accumalated += delta_acc * curr_star.mass;
+                }
+                accumalated
+            })
+            .reduce(
+                || Vector3::zeros(),
+                |a: Vector3<f64>, b: Vector3<f64>| a + b,
+            );
+
+        accel
+    }
 }

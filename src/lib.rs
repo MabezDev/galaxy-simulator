@@ -75,6 +75,7 @@ impl Galaxy {
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
         //     2.0 * rng.gen_range(0.0, 0.1) - 1.0,
         // );
+        // nalgebra has a norm method
         // let norm = 1.0 / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
         // n[0] *= norm;
         // n[1] *= norm;
@@ -127,6 +128,8 @@ impl Galaxy {
         // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
 
         // we avoid the use of locks by double buffering the stars
+        // we calculate based on the `current_stars` as this is the current state of the galaxy
+        // we put all the calculations for the next iteration in another array
         let (currrent_stars, future_stars) = if (self.iter & 1) == 0 {
             (&self.stars.0, &mut self.stars.1)
         } else {
@@ -145,7 +148,7 @@ impl Galaxy {
                 // based on the current stars, compute the new acceleration for the future star state
                 fut_star.acceleration = Galaxy::compute_accelerations(curr_star, currrent_stars);
 
-                // calculate the new velocity with the new accell
+                // calculate the new velocity with the new acceleration
                 fut_star.velocity = Vector3::new(
                     curr_star.velocity[0] + (fut_star.acceleration[0] * DELTA_TIME_HALF),
                     curr_star.velocity[1] + (fut_star.acceleration[1] * DELTA_TIME_HALF),
@@ -165,9 +168,10 @@ impl Galaxy {
         let zero: Vector3<f64> = Vector3::zeros();
         let accel = current_galaxy
             .iter()
+            // Starting a zero, we accumulate the affects of other stars on the current star
             .fold(zero, |mut accumalated, star| {
                 let dp = curr_star.position - star.position;
-                if dp != zero {
+                if dp != zero { // make sure we don't check against ourself
                     let dp2 = dp.component_mul(&dp);
                     let r_squared = dp2.sum();
                     let r = r_squared.sqrt();

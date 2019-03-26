@@ -23,8 +23,6 @@ pub const STAR_COUNT: u64 = 2000;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "Galaxy Simulator")]
 struct Opt {
-    // A flag, true if used in the command line. Note doc comment will
-    // be used for the help message of the flag.
     /// Activate debug mode
     #[structopt(short = "d", long = "debug")]
     debug: bool,
@@ -40,6 +38,10 @@ struct Opt {
     /// MODE - `single` or `parallel`
     #[structopt(short = "m", long = "mode", default_value = "single")]
     mode: String,
+
+    /// Number of threads - defaults to the number of logical cores on the machine if not specified
+    #[structopt(short = "t", long = "threads")]
+    threads: Option<usize>,
 
     /// Task - `bench` or `visualize`
     #[structopt(name = "TASK")]
@@ -58,6 +60,12 @@ fn main() {
     if opt.debug {
         println!("{:?}", opt);
     }
+
+    // allow specicification of the number of used threads
+    if let Some(threads) = opt.threads {
+        rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
+    }
+
     let mode = match opt.mode.to_lowercase().as_ref() {
         "single" => Mode::Single,
         "parallel" => Mode::Parallel,
@@ -67,10 +75,6 @@ fn main() {
         "bench" => {
             // TODO bench code here
             let mut _galaxy = Galaxy::new(opt.stars);
-            match mode {
-                Mode::Single => {},
-                Mode::Parallel => {}
-            }
         },
         "visualize" => {
             let mut galaxy = Galaxy::new(opt.stars);
@@ -127,6 +131,5 @@ fn visualize(galaxy: &mut Galaxy, mode: Mode) {
         }
 
         canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }

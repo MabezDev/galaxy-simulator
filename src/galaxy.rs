@@ -157,7 +157,7 @@ impl Galaxy {
             (&self.stars.1, &mut self.stars.0)
         };
 
-        future_stars.par_iter_mut() // iterate over the future stars
+        future_stars.par_iter_mut() // iterate over the future stars, in a parallel fashion
             .zip(&currrent_stars[..]) // zip in the old stars state (old actually means current stars) for calculations
             .for_each(|(fut_star, curr_star)| {
                 fut_star.position = Vector3::new(
@@ -189,7 +189,7 @@ impl Galaxy {
         let zero: Vector3<f64> = Vector3::zeros();
         let accel = current_galaxy
             .par_iter()
-            // Starting a zero, we accumulate the affects of other stars on the current star
+            // Starting a zero, we accumulate the affects of other stars on the current star in parallel
             .fold(
                 || zero, 
                 |mut accumalated, star| {
@@ -205,7 +205,9 @@ impl Galaxy {
                     accumalated += delta_acc * curr_star.mass;
                 }
                 accumalated
-            })
+            }) 
+            // we then combine the threads work with a reduce method, in this case we are
+            // accumalating all the calculated acceleration deltas
             .reduce(
                 || Vector3::zeros(),
                 |a: Vector3<f64>, b: Vector3<f64>| a + b,

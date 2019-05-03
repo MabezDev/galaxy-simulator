@@ -15,7 +15,7 @@ pub const WINDOW_SIZE: u32 = 800;
 
 pub const STAR_COUNT: u64 = 2000;
 
-/// A basic example
+/// UP745497 Galaxy simulation
 #[derive(StructOpt, Debug)]
 #[structopt(name = "Galaxy Simulator")]
 struct Opt {

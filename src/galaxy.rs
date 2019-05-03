@@ -158,14 +158,14 @@ impl Galaxy {
         // we avoid the use of locks by double buffering the stars
         // we calculate based on the `current_stars` as this is the current state of the galaxy
         // we put all the calculations for the next iteration in another array
-        let (currrent_stars, future_stars) = if (self.iter & 1) == 0 {
+        let (current_stars, future_stars) = if (self.iter & 1) == 0 {
             (&self.stars.0, &mut self.stars.1)
         } else {
             (&self.stars.1, &mut self.stars.0)
         };
 
         future_stars.par_iter_mut() // iterate over the future stars, in a parallel fashion
-            .zip(&currrent_stars[..]) // zip in the old stars state (old actually means current stars) for calculations
+            .zip(&current_stars[..]) // zip in the old stars state (old actually means current stars) for calculations
             .for_each(|(fut_star, curr_star)| {
                 fut_star.position = Vector3::new(
                     curr_star.position[0] + (curr_star.velocity[0] * DELTA_TIME) + (curr_star.acceleration[0] * DELTA_TIME_SQUARED_HALF),
@@ -174,7 +174,7 @@ impl Galaxy {
                 );
 
                 // based on the current stars, compute the new acceleration for the future star state
-                fut_star.acceleration = Galaxy::par_compute_accelerations(curr_star, currrent_stars);
+                fut_star.acceleration = Galaxy::par_compute_accelerations(curr_star, current_stars);
 
                 // calculate the new velocity with the new acceleration
                 fut_star.velocity = Vector3::new(
